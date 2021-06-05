@@ -1,0 +1,272 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+
+/// Animates the position of a widget relative to its normal position.
+///
+/// The translation is expressed as an [Offset] scaled to the child's size. For
+/// example, an [Offset] with a `dx` of 0.25 will result in a horizontal
+/// translation of one quarter the width of the child.
+///
+/// By default, the offsets are applied in the coordinate system of the canvas
+/// (so positive x offsets move the child towards the right). If a
+/// [textDirection] is provided, then the offsets are applied in the reading
+/// direction, so in right-to-left text, positive x offsets move towards the
+/// left, and in left-to-right text, positive x offsets move towards the right.
+///
+/// Here's an illustration of the [SlideTransition] widget, with its [position]
+/// animated by a [CurvedAnimation] set to [Curves.elasticIn]:
+/// {@animation 300 378 https://flutter.github.io/assets-for-api-docs/assets/widgets/slide_transition.mp4}
+///
+/// {@tool dartpad --template=stateful_widget_scaffold_center_freeform_state}
+/// The following code implements the [SlideTransition] as seen in the video
+/// above:
+///
+/// ```dart
+/// class _MyStatefulWidgetState extends State<MyStatefulWidget> with SingleTickerProviderStateMixin {
+///   late final AnimationController _controller = AnimationController(
+///     duration: const Duration(seconds: 2),
+///     vsync: this,
+///   )..repeat(reverse: true);
+///   late final Animation<Offset> _offsetAnimation = Tween<Offset>(
+///     begin: Offset.zero,
+///     end: const Offset(1.5, 0.0),
+///   ).animate(CurvedAnimation(
+///     parent: _controller,
+///     curve: Curves.elasticIn,
+///   ));
+///
+///   @override
+///   void dispose() {
+///     super.dispose();
+///     _controller.dispose();
+///   }
+///
+///   @override
+///   Widget build(BuildContext context) {
+///     return SlideTransition(
+///       position: _offsetAnimation,
+///       child: const Padding(
+///         padding: EdgeInsets.all(8.0),
+///         child: FlutterLogo(size: 150.0),
+///       ),
+///     );
+///   }
+/// }
+/// ```
+/// {@end-tool}
+///
+/// See also:
+///
+///  * [AlignTransition], an animated version of an [Align] that animates its
+///    [Align.alignment] property.
+///  * [PositionedTransition], a widget that animates its child from a start
+///    position to an end position over the lifetime of the animation.
+///  * [RelativePositionedTransition], a widget that transitions its child's
+///    position based on the value of a rectangle relative to a bounding box.
+class AbsoluteSlideTransition extends AnimatedWidget {
+  /// Creates a fractional translation transition.
+  ///
+  /// The [position] argument must not be null.
+  const AbsoluteSlideTransition({
+    Key? key,
+    required Animation<Offset> position,
+    this.transformHitTests = true,
+    this.textDirection,
+    this.child,
+  })  : assert(position != null),
+        super(key: key, listenable: position);
+
+  /// The animation that controls the position of the child.
+  ///
+  /// If the current value of the position animation is `(dx, dy)`, the child
+  /// will be translated horizontally by `width * dx` and vertically by
+  /// `height * dy`, after applying the [textDirection] if available.
+  Animation<Offset> get position => listenable as Animation<Offset>;
+
+  /// The direction to use for the x offset described by the [position].
+  ///
+  /// If [textDirection] is null, the x offset is applied in the coordinate
+  /// system of the canvas (so positive x offsets move the child towards the
+  /// right).
+  ///
+  /// If [textDirection] is [TextDirection.rtl], the x offset is applied in the
+  /// reading direction such that x offsets move the child towards the left.
+  ///
+  /// If [textDirection] is [TextDirection.ltr], the x offset is applied in the
+  /// reading direction such that x offsets move the child towards the right.
+  final TextDirection? textDirection;
+
+  /// Whether hit testing should be affected by the slide animation.
+  ///
+  /// If false, hit testing will proceed as if the child was not translated at
+  /// all. Setting this value to false is useful for fast animations where you
+  /// expect the user to commonly interact with the child widget in its final
+  /// location and you want the user to benefit from "muscle memory".
+  final bool transformHitTests;
+
+  /// The widget below this widget in the tree.
+  ///
+  /// {@macro flutter.widgets.ProxyWidget.child}
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    Offset offset = position.value;
+    if (textDirection == TextDirection.rtl)
+      offset = Offset(-offset.dx, offset.dy);
+    return AbsoluteTranslation(
+      translation: offset,
+      transformHitTests: transformHitTests,
+      child: child,
+    );
+  }
+}
+
+/// Applies a translation transformation before painting its child.
+///
+/// The translation is expressed as a [Offset] scaled to the child's size. For
+/// example, an [Offset] with a `dx` of 0.25 will result in a horizontal
+/// translation of one quarter the width of the child.
+///
+/// Hit tests will only be detected inside the bounds of the
+/// [FractionalTranslation], even if the contents are offset such that
+/// they overflow.
+///
+/// See also:
+///
+///  * [Transform], which applies an arbitrary transform to its child widget at
+///    paint time.
+///  * [new Transform.translate], which applies an absolute offset translation
+///    transformation instead of an offset scaled to the child.
+///  * The [catalog of layout widgets](https://flutter.dev/widgets/layout/).
+class AbsoluteTranslation extends SingleChildRenderObjectWidget {
+  /// Creates a widget that translates its child's painting.
+  ///
+  /// The [translation] argument must not be null.
+  const AbsoluteTranslation({
+    Key? key,
+    required this.translation,
+    this.transformHitTests = true,
+    Widget? child,
+  })  : assert(translation != null),
+        super(key: key, child: child);
+
+  /// The translation to apply to the child, scaled to the child's size.
+  ///
+  /// For example, an [Offset] with a `dx` of 0.25 will result in a horizontal
+  /// translation of one quarter the width of the child.
+  final Offset translation;
+
+  /// Whether to apply the translation when performing hit tests.
+  final bool transformHitTests;
+
+  @override
+  RenderAbsoluteTranslation createRenderObject(BuildContext context) {
+    return RenderAbsoluteTranslation(
+      translation: translation,
+      transformHitTests: transformHitTests,
+    );
+  }
+
+  @override
+  void updateRenderObject(
+      BuildContext context, RenderAbsoluteTranslation renderObject) {
+    renderObject
+      ..translation = translation
+      ..transformHitTests = transformHitTests;
+  }
+}
+
+/// Applies a translation transformation before painting its child.
+///
+/// The translation is expressed as an [Offset] scaled to the child's size. For
+/// example, an [Offset] with a `dx` of 0.25 will result in a horizontal
+/// translation of one quarter the width of the child.
+///
+/// Hit tests will only be detected inside the bounds of the
+/// [RenderAbsoluteTranslation], even if the contents are offset such that
+/// they overflow.
+class RenderAbsoluteTranslation extends RenderProxyBox {
+  /// Creates a render object that translates its child's painting.
+  ///
+  /// The [translation] argument must not be null.
+  RenderAbsoluteTranslation({
+    required Offset translation,
+    this.transformHitTests = true,
+    RenderBox? child,
+  })  : assert(translation != null),
+        _translation = translation,
+        super(child);
+
+  /// The translation to apply to the child, scaled to the child's size.
+  ///
+  /// For example, an [Offset] with a `dx` of 0.25 will result in a horizontal
+  /// translation of one quarter the width of the child.
+  Offset get translation => _translation;
+  Offset _translation;
+  set translation(Offset value) {
+    assert(value != null);
+    if (_translation == value) return;
+    _translation = value;
+    markNeedsPaint();
+    markNeedsSemanticsUpdate();
+  }
+
+  @override
+  bool hitTest(BoxHitTestResult result, {required Offset position}) {
+    // RenderFractionalTranslation objects don't check if they are
+    // themselves hit, because it's confusing to think about
+    // how the untransformed size and the child's transformed
+    // position interact.
+    return hitTestChildren(result, position: position);
+  }
+
+  /// When set to true, hit tests are performed based on the position of the
+  /// child as it is painted. When set to false, hit tests are performed
+  /// ignoring the transformation.
+  ///
+  /// applyPaintTransform(), and therefore localToGlobal() and globalToLocal(),
+  /// always honor the transformation, regardless of the value of this property.
+  bool transformHitTests;
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    assert(!debugNeedsLayout);
+    return result.addWithPaintOffset(
+      offset: transformHitTests ? Offset(translation.dx, translation.dy) : null,
+      position: position,
+      hitTest: (BoxHitTestResult result, Offset? position) {
+        return super.hitTestChildren(result, position: position!);
+      },
+    );
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    assert(!debugNeedsLayout);
+    if (child != null) {
+      super.paint(
+          context,
+          Offset(
+            offset.dx + translation.dx,
+            offset.dy + translation.dy,
+          ));
+    }
+  }
+
+  @override
+  void applyPaintTransform(RenderBox child, Matrix4 transform) {
+    transform.translate(
+      translation.dx,
+      translation.dy,
+    );
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<Offset>('translation', translation));
+    properties
+        .add(DiagnosticsProperty<bool>('transformHitTests', transformHitTests));
+  }
+}
